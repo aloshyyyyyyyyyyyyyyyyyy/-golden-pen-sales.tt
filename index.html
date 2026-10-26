@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Golden Pen - گولدن بين</title>
+<style>
+body{font-family:Arial;background:#f1f4f9;margin:0;color:#172033}
+header{background:#123a73;color:white;text-align:center;padding:20px}
+main{max-width:600px;margin:auto;padding:15px}
+.card{background:white;padding:15px;margin:12px 0;border-radius:12px}
+input{width:100%;padding:12px;margin:6px 0;box-sizing:border-box;border:1px solid #bbb;border-radius:8px;font-size:16px}
+button{padding:12px;border:0;border-radius:8px;background:#123a73;color:white;font-size:15px;margin:4px;cursor:pointer}
+.red{background:#d93025}.gray{background:#667085}
+.item{padding:12px;border-bottom:1px solid #ddd}
+.price{color:#123a73;font-weight:bold}
+#reader{width:100%;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+<h2>🖊️ Golden Pen</h2>
+<p>گولدن بين — خزن المواد والبحث بالباركود</p>
+</header>
+<main>
+<section class="card">
+<h3>📦 إضافة مادة جديدة</h3>
+<label>الباركود</label>
+<input id="barcode" placeholder="امسح أو اكتب الباركود">
+<button onclick="scan()">📷 مسح بالكاميرا</button>
+<div id="reader"></div>
+
+<label>اسم المادة</label>
+<input id="name" placeholder="مثال: قلم أزرق">
+
+<label>السعر بالدولار ($)</label>
+<input id="price" type="number" min="0" step="0.01" placeholder="مثال: 0.50">
+
+<button onclick="save()">💾 حفظ المادة</button>
+<button class="gray" onclick="clearForm()">تفريغ الحقول</button>
+</section>
+
+<section class="card">
+<h3>🔍 البحث عن مادة</h3>
+<input id="search" placeholder="اكتب الباركود أو اسم المادة"
+oninput="showItems()">
+<button onclick="scanSearch()">📷 البحث بالكاميرا</button>
+<div id="results"></div>
+</section>
+
+<section class="card">
+<h3>💾 نسخة احتياطية</h3>
+<button onclick="backup()">تنزيل نسخة المواد</button>
+<input type="file" id="restoreFile" accept=".json,application/json"
+onchange="restore(event)">
+<button class="gray" onclick="document.getElementById('restoreFile').click()">استرجاع نسخة</button>
+</section>
+</main>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+const KEY="goldenPenInventory";
+let products=[];
+try {
+ products=JSON.parse(localStorage.getItem(KEY)||"[]");
+} catch(e) { products=[]; }
+
+function store(){
+ localStorage.setItem(KEY,JSON.stringify(products));
+}
+
+function clearForm(){
+ document.getElementById("barcode").value="";
+ document.getElementById("name").value="";
+ document.getElementById("price").value="";
+}
+
+function save(){
+ const barcode=document.getElementById("barcode").value.trim();
+ const name=document.getElementById("name").value.trim();
+ const priceInput=document.getElementById("price").value;
+ const price=Number(priceInput);
+
+ if(!barcode){alert("اكتب الباركود أو امسحه بالكاميرا");return;}
+ if(!name){alert("اكتب اسم المادة");return;}
+ if(priceInput===""||!Number.isFinite(price)||price<0){
+  alert("اكتب سعر صحيح بالدولار");return;
+ }
+
+ const old=products.find(p=>p.barcode===barcode);
+ if(old){
+  if(!confirm("هذا الباركود موجود. تريد تحديث بيانات المادة؟"))return;
+  old.name=name;
+  old.price=price;
+ }else{
+  products.push({barcode,name,price});
+ }
+ store();
+ clearForm();
+ showItems();
+ alert("تم حفظ المادة بنجاح");
+}
+
+function showItems(){
+ const q=document.getElementById("search").value.trim().toLowerCase();
+ const list=products.filter(p=>
+  p.barcode.toLowerCase().includes(q)||
+  p.name.toLowerCase().includes(q)
+ );
+ const out=document.getElementById("results");
+
+ if(!list.length){
+  out.innerHTML="<p>ماكو مواد مطابقة للبحث.</p>";
+  return;
+ }
+
+ out.innerHTML=list.map(p=>`
+ <div class="item">
+  <b>${esc(p.name)}</b><br>
+  الباركود: ${esc(p.barcode)}<br>
+  <span class="price">السعر: $${Number(p.price).toFixed(2)}</span><br>
+  <button onclick="editItem('${encodeURIComponent(p.barcode)}')">تعديل</button>
+  <button class="red" onclick="deleteItem('${encodeURIComponent(p.barcode)}')">حذف</button>
+ </div>`).join("");
+}
+
+function editItem(code){
+ const p=products.find(x=>x.barcode===decodeURIComponent(code));
+ if(!p)return;
+ document.getElementById("barcode").value=p.barcode;
+ document.getElementById("name").value=p.name;
+ document.getElementById("price").value=p.price;
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function deleteItem(code){
+ const barcode=decodeURIComponent(code);
+ if(!confirm("متأكد تريد حذف المادة؟"))return;
+ products=products.filter(p=>p.barcode!==barcode);
+ store();
+ showItems();
+}
+
+function esc(s){
+ return String(s).replace(/[&<>"']/g,c=>({
+ "&":"&amp;","<":"&lt;",">":"&gt;",
+ '"':"&quot;","'":"&#39;"
+ }[c]));
+}
+
+let scanner=null;
+
+async function startCamera(target){
+ if(!window.Html5Qrcode){
+  alert("تعذر تحميل ماسح الباركود. تأكد من الإنترنت.");
+  return;
+ }
+ if(scanner){
+  try{await scanner.stop();scanner.clear();}catch(e){}
+  scanner=null;
+ }
+ const reader=document.getElementById("reader");
+ reader.innerHTML="";
+ scanner=new Html5Qrcode("reader");
+ try{
+  await scanner.start(
+   {facingMode:"environment"},
+   {fps:10,qrbox:{width:250,height:150}},
+   async code=>{
+    document.getElementById(target).value=code;
+    try{await scanner.stop();scanner.clear();}catch(e){}
+    scanner=null;
+    reader.innerHTML="";
+    if(target==="search")showItems();
+   },
+   ()=>{}
+  );
+ }catch(e){
+  alert("اسمح للموقع باستخدام الكاميرا وافتحه عبر HTTPS.");
+  scanner=null;
+ }
+}
+
+function scan(){startCamera("barcode");}
+function scanSearch(){startCamera("search");}
+
+function backup(){
+ const blob=new Blob([JSON.stringify(products,null,2)],
+  {type:"application/json"});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");
+ a.href=url;
+ a.download="golden-pen-inventory.json";
+ a.click();
+ URL.revokeObjectURL(url);
+}
+
+function restore(event){
+ const file=event.target.files[0];
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=()=>{
+  try{
+   const data=JSON.parse(reader.result);
+   if(!Array.isArray(data)||
+    !data.every(p=>p.barcode&&p.name!==undefined&&Number.isFinite(Number(p.price))))
+    throw new Error();
+   if(confirm("استبدال المواد الحالية بالنسخة الاحتياطية؟")){
+    products=data;
+    store();
+    showItems();
+    alert("تم استرجاع المواد");
+   }
+  }catch(e){alert("ملف النسخة الاحتياطية غير صالح");}
+  event.target.value="";
+ };
+ reader.readAsText(file);
+}
+
+showItems();
+</script>
+</body>
+</html>
