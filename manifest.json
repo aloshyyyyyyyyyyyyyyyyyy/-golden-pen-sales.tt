@@ -1,0 +1,10 @@
+{
+  "name": "Golden Pen - گولدن بين",
+  "short_name": "Golden Pen",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f1f4f9",
+  "theme_color": "#123a73",
+  "description": "خزن مواد القرطاسية والبحث بالباركود"
+}
