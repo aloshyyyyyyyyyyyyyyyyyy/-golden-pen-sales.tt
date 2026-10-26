@@ -1,7 +1,7 @@
 
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head>
+<head><link rel="manifest" href="./manifest.json">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Golden Pen - گولدن بين</title>
@@ -18,7 +18,13 @@ button{padding:12px;border:0;border-radius:8px;background:#123a73;color:white;fo
 #reader{width:100%;margin-top:10px}
 </style>
 </head>
-<body>
+<body><script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js");
+  });
+}
+</script>
 <header>
 <h2>🖊️ Golden Pen</h2>
 <p>گولدن بين — خزن المواد والبحث بالباركود</p>
